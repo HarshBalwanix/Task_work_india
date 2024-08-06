@@ -2,6 +2,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
 const ApiResponse = require("../utils/apiResponse");
 const { Post, User } = require("../models/index");
+const { sequelize } = require("../models/index");
 
 // Create a new post
 const createPost = asyncHandler(async (req, res) => {
@@ -33,92 +34,34 @@ const createPost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, post.id, "Short added successfully"));
 });
 
-// Read all posts
+// Get all posts
+// tried in 2 diff ways, but unable to do right now
+// done now and tested
 const getAllPosts = asyncHandler(async (req, res) => {
-  const posts = await Post.findAll();
+  const posts = await Post.findAll({
+    // attributes: {
+    //   include: [
+    //     [
+    //       sequelize.fn(
+    //         "JSON_UNQUOTE",
+    //         sequelize.fn("JSON_EXTRACT", sequelize.col("votes"), "$.upvote")
+    //       ),
+    //       "upvote",
+    //     ],
+    //   ],
+    // },
+    order: [
+      ["publish_date", "DESC"],
+      [sequelize.literal("JSON_EXTRACT(votes, '$.upvote')"), "DESC"],
+    ],
+  });
 
   return res
     .status(200)
     .json(new ApiResponse(200, posts, "Posts retrieved successfully"));
 });
 
-// Read a single post by ID
-const getPostById = asyncHandler(async (req, res) => {
-  const post = await Post.findByPk(req.params.id);
-
-  if (!post) {
-    throw new ApiError(404, "Post not found");
-  }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, post, "Post retrieved successfully"));
-});
-
-// Update a post
-const updatePost = asyncHandler(async (req, res) => {
-  const {
-    category,
-    title,
-    author,
-    publish_date,
-    content,
-    actual_content_link,
-    image,
-  } = req.body;
-
-  const user = await User.findByPk(req.user.id);
-
-  if (user.role !== "admin") {
-    throw new ApiError(403, "Only admins can update posts");
-  }
-
-  const post = await Post.findByPk(req.params.id);
-
-  if (!post) {
-    throw new ApiError(404, "Post not found");
-  }
-
-  post.category = category;
-  post.title = title;
-  post.author = author;
-  post.publish_date = publish_date;
-  post.content = content;
-  post.actual_content_link = actual_content_link;
-  post.image = image;
-
-  await post.save();
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, post, "Post updated successfully"));
-});
-
-// Delete a post
-const deletePost = asyncHandler(async (req, res) => {
-  const user = await User.findByPk(req.user.id);
-
-  if (user.role !== "admin") {
-    throw new ApiError(403, "Only admins can delete posts");
-  }
-
-  const post = await Post.findByPk(req.params.id);
-
-  if (!post) {
-    throw new ApiError(404, "Post not found");
-  }
-
-  await post.destroy();
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, "Post deleted successfully"));
-});
-
 module.exports = {
   createPost,
   getAllPosts,
-  getPostById,
-  updatePost,
-  deletePost,
 };
